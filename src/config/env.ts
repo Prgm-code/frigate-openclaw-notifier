@@ -1,6 +1,12 @@
-import { NotifierConfig, parseBoolean, parseList, parseLogLevel, parseNumber, requireString } from "./schema.js";
+import { NotifierConfig, parseBoolean, parseList, parseLogLevel, parseNumber, requireOneString, requireString } from "./schema.js";
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): NotifierConfig {
+  requireOneString([
+    { value: env.OPENCLAW_TARGET, name: "OPENCLAW_TARGET" },
+    { value: env.OPENCLAW_GROUP_ID, name: "OPENCLAW_GROUP_ID" }
+  ]);
+  const openclawTargets = [...new Set(parseList(`${env.OPENCLAW_TARGET || ""},${env.OPENCLAW_GROUP_ID || ""}`))];
+
   return {
     mqttUrl: requireString(env.MQTT_URL, "MQTT_URL"),
     mqttUsername: env.MQTT_USERNAME || undefined,
@@ -20,7 +26,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): NotifierConfig
     openclawBin: env.OPENCLAW_BIN || "openclaw",
     openclawChannel: "whatsapp",
     openclawAccount: env.OPENCLAW_ACCOUNT || undefined,
-    openclawTarget: requireString(env.OPENCLAW_TARGET, "OPENCLAW_TARGET"),
+    openclawTarget: env.OPENCLAW_TARGET || undefined,
+    openclawGroupId: env.OPENCLAW_GROUP_ID || undefined,
+    openclawTargets,
     notifyOnReviewNew: parseBoolean(env.NOTIFY_ON_REVIEW_NEW, true),
     notifyOnReviewUpdate: parseBoolean(env.NOTIFY_ON_REVIEW_UPDATE, false),
     notifyOnReviewEnd: parseBoolean(env.NOTIFY_ON_REVIEW_END, false),

@@ -75,6 +75,7 @@ MQTT_USERNAME=<mqtt-user>
 MQTT_PASSWORD=<mqtt-password>
 FRIGATE_BASE_URL=http://<frigate-host>:5000/api
 OPENCLAW_TARGET=<E164_OR_GROUP_JID>
+OPENCLAW_GROUP_ID=<GROUP_JID_OPTIONAL>
 MEDIA_TMP_DIR=/tmp/frigate-openclaw
 ```
 
@@ -85,6 +86,15 @@ ALLOWED_CAMERAS=<camera-1>,<camera-2>
 ```
 
 Use the exact Frigate camera names, for example the value that appears in MQTT as `"camera": "..."`.
+
+OpenClaw destinations:
+
+```bash
+OPENCLAW_TARGET=<E164_OR_GROUP_JID>
+OPENCLAW_GROUP_ID=<GROUP_JID_OPTIONAL>
+```
+
+If both are set, every alert and alert-control confirmation is sent to both destinations. At least one of `OPENCLAW_TARGET` or `OPENCLAW_GROUP_ID` must be set.
 
 ## Run
 

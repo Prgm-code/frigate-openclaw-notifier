@@ -35,7 +35,7 @@ logger.info("notifier_config_loaded", {
   blockedZones: config.blockedZones,
   sendSnapshot: config.sendSnapshot,
   sendClip: config.sendClip,
-  openclawTarget: "configured",
+  openclawTargets: config.openclawTargets.length,
   openclawTimeoutMs: config.openclawTimeoutMs,
   mediaTmpDir: config.mediaTmpDir,
   mediaRetentionSeconds: config.mediaRetentionSeconds,

@@ -17,6 +17,7 @@ import { cleanupOldMedia, removeMediaFiles } from "./media/cleanup.js";
 import { MediaResolver } from "./media/resolver.js";
 import { processVideoForWhatsapp } from "./media/video.js";
 import { OpenClawCli } from "./openclaw/cli.js";
+import { OpenClawSendResult } from "./openclaw/types.js";
 import { renderCaption } from "./templates/text.js";
 
 export class NotifierApp {
@@ -233,15 +234,13 @@ export class NotifierApp {
             source: "frigate/events",
             kind: "text",
             eventId,
-            target: redactTarget(this.config.openclawTarget)
+            targets: this.redactedTargets()
           });
-          const result = await this.openclaw.sendText(this.config.openclawTarget, caption);
+          const results = await this.sendTextToTargets(caption);
           this.logger.info("whatsapp_text_sent", {
             source: "frigate/events",
             eventId,
-            target: redactTarget(this.config.openclawTarget),
-            messageId: result.messageId,
-            mediaUrl: result.mediaUrl
+            results: this.formatSendResults(results)
           });
         }
       } catch (error) {
@@ -299,23 +298,19 @@ export class NotifierApp {
     try {
       const media = await this.mediaResolver.resolve(context.camera, context.eventIds[0]);
       if (media) {
-        const result = await this.openclaw.sendMedia(this.config.openclawTarget, media.path, caption);
+        const results = await this.sendMediaToTargets(media.path, caption);
         this.logger.info("whatsapp_media_sent", {
           kind: media.kind,
           reviewId: context.reviewId,
           eventId: context.eventIds[0],
-          target: redactTarget(this.config.openclawTarget),
-          messageId: result.messageId,
-          mediaUrl: result.mediaUrl
+          results: this.formatSendResults(results)
         });
       } else {
-        const result = await this.openclaw.sendText(this.config.openclawTarget, caption);
+        const results = await this.sendTextToTargets(caption);
         this.logger.info("whatsapp_text_sent", {
           reviewId: context.reviewId,
           eventId: context.eventIds[0],
-          target: redactTarget(this.config.openclawTarget),
-          messageId: result.messageId,
-          mediaUrl: result.mediaUrl
+          results: this.formatSendResults(results)
         });
       }
 
@@ -352,16 +347,14 @@ export class NotifierApp {
           kind: snapshot.kind,
           eventId,
           path: snapshot.path,
-          target: redactTarget(this.config.openclawTarget)
+          targets: this.redactedTargets()
         });
-        const result = await this.openclaw.sendMedia(this.config.openclawTarget, snapshot.path, caption);
+        const results = await this.sendMediaToTargets(snapshot.path, caption);
         this.logger.info("whatsapp_media_sent", {
           source: "frigate/events",
           kind: snapshot.kind,
           eventId,
-          target: redactTarget(this.config.openclawTarget),
-          messageId: result.messageId,
-          mediaUrl: result.mediaUrl
+          results: this.formatSendResults(results)
         });
         return true;
       }
@@ -412,17 +405,15 @@ export class NotifierApp {
         kind: "clip",
         eventId,
         path: processedPath,
-        target: redactTarget(this.config.openclawTarget)
+        targets: this.redactedTargets()
       });
-      const result = await this.openclaw.sendMedia(this.config.openclawTarget, processedPath, `Video: ${caption}`);
+      const results = await this.sendMediaToTargets(processedPath, `Video: ${caption}`);
       this.logger.info("whatsapp_media_sent", {
         source: "frigate/events",
         kind: "clip",
         eventId,
         processed: true,
-        target: redactTarget(this.config.openclawTarget),
-        messageId: result.messageId,
-        mediaUrl: result.mediaUrl
+        results: this.formatSendResults(results)
       });
     } finally {
       await removeMediaFiles([clip.path, processedPath], this.logger);
@@ -441,15 +432,13 @@ export class NotifierApp {
   private sendAlertControlConfirmation(message: string, fields: Record<string, unknown>): void {
     this.logger.info("alert_control_whatsapp_confirmation_started", {
       ...fields,
-      target: redactTarget(this.config.openclawTarget)
+      targets: this.redactedTargets()
     });
-    this.openclaw
-      .sendText(this.config.openclawTarget, message)
-      .then((result) => {
+    this.sendTextToTargets(message)
+      .then((results) => {
         this.logger.info("alert_control_whatsapp_confirmation_sent", {
           ...fields,
-          target: redactTarget(this.config.openclawTarget),
-          messageId: result.messageId
+          results: this.formatSendResults(results)
         });
       })
       .catch((error: unknown) => {
@@ -458,5 +447,25 @@ export class NotifierApp {
           error: error instanceof Error ? error.message : String(error)
         });
       });
+  }
+
+  private sendTextToTargets(message: string): Promise<OpenClawSendResult[]> {
+    return Promise.all(this.config.openclawTargets.map((target) => this.openclaw.sendText(target, message)));
+  }
+
+  private sendMediaToTargets(mediaPathOrUrl: string, caption?: string): Promise<OpenClawSendResult[]> {
+    return Promise.all(this.config.openclawTargets.map((target) => this.openclaw.sendMedia(target, mediaPathOrUrl, caption)));
+  }
+
+  private redactedTargets(): string[] {
+    return this.config.openclawTargets.map((target) => redactTarget(target));
+  }
+
+  private formatSendResults(results: OpenClawSendResult[]): Array<{ target: string; messageId?: string; mediaUrl?: string }> {
+    return results.map((result, index) => ({
+      target: redactTarget(this.config.openclawTargets[index] || result.to),
+      messageId: result.messageId,
+      mediaUrl: result.mediaUrl
+    }));
   }
 }

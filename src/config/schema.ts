@@ -19,7 +19,9 @@ export interface NotifierConfig {
   openclawBin: string;
   openclawChannel: "whatsapp";
   openclawAccount?: string;
-  openclawTarget: string;
+  openclawTarget?: string;
+  openclawGroupId?: string;
+  openclawTargets: string[];
   notifyOnReviewNew: boolean;
   notifyOnReviewUpdate: boolean;
   notifyOnReviewEnd: boolean;
@@ -88,6 +90,12 @@ export function requireString(value: string | undefined, name: string): string {
     throw new Error(`${name} is required`);
   }
   return value.trim();
+}
+
+export function requireOneString(values: Array<{ value: string | undefined; name: string }>): void {
+  if (!values.some((item) => item.value && item.value.trim() !== "")) {
+    throw new Error(`One of ${values.map((item) => item.name).join(", ")} is required`);
+  }
 }
 
 export function parseLogLevel(value: string | undefined): LogLevel {

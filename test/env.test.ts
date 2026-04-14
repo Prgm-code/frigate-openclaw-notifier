@@ -16,6 +16,7 @@ describe("loadConfig", () => {
       HOME_ASSISTANT_DEVICE_NAME: testEnv.homeAssistantDeviceName,
       FRIGATE_BASE_URL: testEnv.frigateBaseUrl,
       OPENCLAW_TARGET: testEnv.openclawTarget,
+      OPENCLAW_GROUP_ID: testEnv.openclawGroupId,
       MEDIA_TMP_DIR: testEnv.mediaTmpDir
     });
 
@@ -34,6 +35,8 @@ describe("loadConfig", () => {
     expect(config.frigateBaseUrl).toBe(testEnv.frigateBaseUrl);
     expect(config.sendClip).toBe(true);
     expect(config.openclawTarget).toBe(testEnv.openclawTarget);
+    expect(config.openclawGroupId).toBe(testEnv.openclawGroupId);
+    expect(config.openclawTargets).toEqual([testEnv.openclawTarget, testEnv.openclawGroupId]);
     expect(config.mediaRetentionSeconds).toBe(3600);
     expect(config.ffmpegBin).toBe(testEnv.ffmpegBin);
     expect(config.videoProcessTimeoutMs).toBe(120_000);
@@ -43,7 +46,20 @@ describe("loadConfig", () => {
     expect(config.messageTimeZone).toBe(testEnv.messageTimeZone);
   });
 
-  it("requires deployment-specific environment variables", () => {
-    expect(() => loadConfig({})).toThrow(/MQTT_URL/);
+  it("requires at least one OpenClaw destination", () => {
+    expect(() => loadConfig({})).toThrow(/OPENCLAW_TARGET, OPENCLAW_GROUP_ID/);
+  });
+
+  it("allows group-only OpenClaw targets", () => {
+    const config = loadConfig({
+      MQTT_URL: testEnv.mqttUrl,
+      FRIGATE_BASE_URL: testEnv.frigateBaseUrl,
+      OPENCLAW_GROUP_ID: testEnv.openclawGroupId,
+      MEDIA_TMP_DIR: testEnv.mediaTmpDir
+    });
+
+    expect(config.openclawTarget).toBeUndefined();
+    expect(config.openclawGroupId).toBe(testEnv.openclawGroupId);
+    expect(config.openclawTargets).toEqual([testEnv.openclawGroupId]);
   });
 });
