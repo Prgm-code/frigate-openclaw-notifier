@@ -1,0 +1,18 @@
+[Unit]
+Description=Frigate OpenClaw WhatsApp Notifier
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/frigate-openclaw-notifier
+EnvironmentFile=/etc/frigate-openclaw-notifier.env
+ExecStart=/usr/bin/node /opt/frigate-openclaw-notifier/dist/index.js
+Restart=on-failure
+RestartSec=5
+User=frigate-openclaw
+Group=frigate-openclaw
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
