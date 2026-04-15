@@ -6,6 +6,8 @@ import {
   discoveryTopic,
   formatCameraAlertControlMessage,
   formatGlobalAlertControlMessage,
+  formatHomeAssistantOpenClawControlMessage,
+  parseHomeAssistantOpenClawPayload,
   parseAlertControlPayload
 } from "../src/alert-control.js";
 import { testEnv } from "./helpers.js";
@@ -24,6 +26,14 @@ describe("parseAlertControlPayload", () => {
 
   it("rejects unknown commands", () => {
     expect(parseAlertControlPayload("maybe")).toBeUndefined();
+  });
+
+  it("accepts Home Assistant OpenClaw payloads", () => {
+    expect(parseHomeAssistantOpenClawPayload(JSON.stringify({ message: "Alerta Home Assistant: porton abierto" }))).toBe(
+      "Alerta Home Assistant: porton abierto"
+    );
+    expect(parseHomeAssistantOpenClawPayload(JSON.stringify({ message: "   " }))).toBeUndefined();
+    expect(parseHomeAssistantOpenClawPayload(JSON.stringify({ enabled: true }))).toBeUndefined();
   });
 
   it("builds camera control topics from camera names", () => {
@@ -50,5 +60,6 @@ describe("parseAlertControlPayload", () => {
     expect(formatGlobalAlertControlMessage(true)).toBe("Alertas Frigate OpenClaw: ON");
     expect(formatGlobalAlertControlMessage(false)).toBe("Alertas Frigate OpenClaw: OFF");
     expect(formatCameraAlertControlMessage(testEnv.cameraName, false)).toBe(`Alertas Frigate OpenClaw ${testEnv.cameraName}: OFF`);
+    expect(formatHomeAssistantOpenClawControlMessage(true)).toBe("Mensajes MQTT a OpenClaw: ON");
   });
 });

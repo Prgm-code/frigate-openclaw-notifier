@@ -23,6 +23,10 @@ const app = new NotifierApp(config, logger, correlator, dedupe, mediaResolver, o
 logger.info("notifier_config_loaded", {
   mqttUrl: config.mqttUrl,
   mqttTopics: config.mqttTopics,
+  homeAssistantOpenClawTopic: config.homeAssistantOpenClawTopic,
+  homeAssistantOpenClawControlCommandTopic: config.homeAssistantOpenClawControlCommandTopic,
+  homeAssistantOpenClawControlStateTopic: config.homeAssistantOpenClawControlStateTopic,
+  homeAssistantOpenClawDefaultEnabled: config.homeAssistantOpenClawDefaultEnabled,
   alertControlCommandTopic: config.alertControlCommandTopic,
   alertControlStateTopic: config.alertControlStateTopic,
   alertControlDefaultEnabled: config.alertControlDefaultEnabled,
@@ -88,6 +92,21 @@ function publishHomeAssistantDiscovery(mqttClient: MqttClient): void {
   const globalTopic = discoveryTopic(config.homeAssistantDiscoveryPrefix, "alerts");
   mqttClient.publish(globalTopic, JSON.stringify(globalPayload), { retain: true, qos: 1 });
   logger.info("home_assistant_discovery_published", { topic: globalTopic, name: globalPayload.name });
+
+  const homeAssistantOpenClawPayload = buildSwitchDiscoveryPayload({
+    name: "Home Assistant OpenClaw Messages",
+    uniqueId: `${config.homeAssistantDeviceId}_homeassistant_openclaw`,
+    commandTopic: config.homeAssistantOpenClawControlCommandTopic,
+    stateTopic: config.homeAssistantOpenClawControlStateTopic,
+    deviceId: config.homeAssistantDeviceId,
+    deviceName: config.homeAssistantDeviceName
+  });
+  const homeAssistantOpenClawDiscoveryTopic = discoveryTopic(config.homeAssistantDiscoveryPrefix, "homeassistant_openclaw");
+  mqttClient.publish(homeAssistantOpenClawDiscoveryTopic, JSON.stringify(homeAssistantOpenClawPayload), { retain: true, qos: 1 });
+  logger.info("home_assistant_discovery_published", {
+    topic: homeAssistantOpenClawDiscoveryTopic,
+    name: homeAssistantOpenClawPayload.name
+  });
 
   for (const { camera, commandTopic, stateTopic } of app.cameraStateTopics()) {
     const payload = buildSwitchDiscoveryPayload({

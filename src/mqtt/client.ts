@@ -16,7 +16,16 @@ export function startMqttClient(config: NotifierConfig, logger: Logger, onMessag
   client.on("connect", () => {
     const cameraCommandTopics = config.allowedCameras.map((camera) => cameraCommandTopic(config.alertControlCameraTopicPrefix, camera));
     const cameraStateTopics = config.allowedCameras.map((camera) => cameraStateTopic(config.alertControlCameraTopicPrefix, camera));
-    const topics = unique([...config.mqttTopics, config.alertControlCommandTopic, config.alertControlStateTopic, ...cameraCommandTopics, ...cameraStateTopics]);
+    const topics = unique([
+      ...config.mqttTopics,
+      config.homeAssistantOpenClawTopic,
+      config.homeAssistantOpenClawControlCommandTopic,
+      config.homeAssistantOpenClawControlStateTopic,
+      config.alertControlCommandTopic,
+      config.alertControlStateTopic,
+      ...cameraCommandTopics,
+      ...cameraStateTopics
+    ]);
     logger.info("mqtt_connected", { url: config.mqttUrl, topics });
     client.subscribe(topics, (error) => {
       if (error) {

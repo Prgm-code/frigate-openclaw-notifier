@@ -11,11 +11,26 @@ export async function handleMqttMessage(app: NotifierApp, topic: string, payload
     return;
   }
 
+  if (topic === app.config.homeAssistantOpenClawControlCommandTopic) {
+    app.handleHomeAssistantOpenClawControlCommand(payload);
+    return;
+  }
+
+  if (topic === app.config.homeAssistantOpenClawControlStateTopic) {
+    app.handleHomeAssistantOpenClawControlState(payload);
+    return;
+  }
+
   if (app.handleCameraAlertControlCommand(topic, payload)) {
     return;
   }
 
   if (app.handleCameraAlertControlState(topic, payload)) {
+    return;
+  }
+
+  if (topic === app.config.homeAssistantOpenClawTopic) {
+    await app.handleHomeAssistantOpenClawMessage(payload);
     return;
   }
 

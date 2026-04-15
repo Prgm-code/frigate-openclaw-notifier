@@ -4,6 +4,8 @@ import {
   cameraStateTopic,
   formatCameraAlertControlMessage,
   formatGlobalAlertControlMessage,
+  formatHomeAssistantOpenClawControlMessage,
+  parseHomeAssistantOpenClawPayload,
   parseAlertControlPayload,
   slugifyTopicPart
 } from "./alert-control.js";
@@ -22,6 +24,7 @@ import { renderCaption } from "./templates/text.js";
 
 export class NotifierApp {
   private alertsEnabled: boolean;
+  private homeAssistantOpenClawEnabled: boolean;
   private readonly cameraAlertsEnabled = new Map<string, boolean>();
   private readonly cameraBySlug = new Map<string, string>();
   private alertStatePublisher?: AlertStatePublisher;
@@ -35,6 +38,7 @@ export class NotifierApp {
     private readonly openclaw: OpenClawCli
   ) {
     this.alertsEnabled = config.alertControlDefaultEnabled;
+    this.homeAssistantOpenClawEnabled = config.homeAssistantOpenClawDefaultEnabled;
     for (const camera of config.allowedCameras) {
       this.cameraAlertsEnabled.set(camera, config.alertControlDefaultEnabled);
       this.cameraBySlug.set(slugifyTopicPart(camera), camera);
@@ -58,9 +62,47 @@ export class NotifierApp {
 
   publishAllAlertStates(source: string): void {
     this.publishAlertState(source);
+    this.publishHomeAssistantOpenClawState(source);
     for (const camera of this.config.allowedCameras) {
       this.publishCameraAlertState(camera, source);
     }
+  }
+
+  handleHomeAssistantOpenClawControlCommand(payload: string | Buffer): void {
+    this.applyHomeAssistantOpenClawControlPayload(payload, "command");
+  }
+
+  handleHomeAssistantOpenClawControlState(payload: string | Buffer): void {
+    this.applyHomeAssistantOpenClawControlPayload(payload, "retained_state");
+  }
+
+  private applyHomeAssistantOpenClawControlPayload(payload: string | Buffer, source: string): void {
+    const enabled = parseAlertControlPayload(payload);
+    if (enabled === undefined) {
+      this.logger.warn("homeassistant_openclaw_control_command_invalid", { payload: payload.toString() });
+      this.publishHomeAssistantOpenClawState("invalid_command");
+      return;
+    }
+
+    this.homeAssistantOpenClawEnabled = enabled;
+    this.logger.info("homeassistant_openclaw_control_state_changed", { enabled, source });
+    if (source === "command") {
+      this.publishHomeAssistantOpenClawState("command");
+      this.sendAlertControlConfirmation(formatHomeAssistantOpenClawControlMessage(enabled), {
+        scope: "homeassistant_openclaw",
+        enabled
+      });
+    }
+  }
+
+  private publishHomeAssistantOpenClawState(source: string): void {
+    const payload = {
+      enabled: this.homeAssistantOpenClawEnabled,
+      updatedAt: new Date().toISOString(),
+      source
+    };
+    this.alertStatePublisher?.(this.config.homeAssistantOpenClawControlStateTopic, payload);
+    this.logger.info("homeassistant_openclaw_control_state_published", payload);
   }
 
   handleAlertControlCommand(payload: string | Buffer): void {
@@ -111,6 +153,34 @@ export class NotifierApp {
       return false;
     }
     return this.applyCameraAlertControlPayload(topic, payload, "retained_state");
+  }
+
+  async handleHomeAssistantOpenClawMessage(payload: string | Buffer): Promise<void> {
+    const message = parseHomeAssistantOpenClawPayload(payload);
+    if (!message) {
+      this.logger.warn("homeassistant_openclaw_message_invalid", { payload: payload.toString() });
+      return;
+    }
+
+    if (!this.homeAssistantOpenClawEnabled) {
+      this.logger.info("homeassistant_openclaw_message_suppressed", { reason: "homeassistant_openclaw_disabled" });
+      return;
+    }
+
+    this.logger.info("homeassistant_openclaw_message_received", {
+      targets: this.redactedTargets(),
+      length: message.length
+    });
+    this.logger.info("openclaw_send_started", {
+      source: "homeassistant/mqtt",
+      kind: "text",
+      targets: this.redactedTargets()
+    });
+
+    const results = await this.sendTextToTargets(message);
+    this.logger.info("homeassistant_openclaw_message_sent", {
+      results: this.formatSendResults(results)
+    });
   }
 
   private applyCameraAlertControlPayload(topic: string, payload: string | Buffer, source: string): boolean {

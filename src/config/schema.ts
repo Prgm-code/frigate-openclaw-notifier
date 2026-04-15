@@ -5,6 +5,10 @@ export interface NotifierConfig {
   mqttUsername?: string;
   mqttPassword?: string;
   mqttTopics: string[];
+  homeAssistantOpenClawTopic: string;
+  homeAssistantOpenClawControlCommandTopic: string;
+  homeAssistantOpenClawControlStateTopic: string;
+  homeAssistantOpenClawDefaultEnabled: boolean;
   alertControlCommandTopic: string;
   alertControlStateTopic: string;
   alertControlDefaultEnabled: boolean;

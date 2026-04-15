@@ -53,6 +53,7 @@ UNIT_TMP="$(mktemp)"
 sed \
   -e "s|^WorkingDirectory=.*|WorkingDirectory=$APP_DIR|" \
   -e "s|^EnvironmentFile=.*|EnvironmentFile=$ENV_FILE|" \
+  -e "s|^Environment=PATH=.*|Environment=PATH=$DEPLOY_PATH|" \
   -e "s|^ExecStart=.*|ExecStart=$NODE_BIN $APP_DIR/dist/src/index.js|" \
   -e "s|^User=.*|User=$SERVICE_USER|" \
   -e "s|^Group=.*|Group=$SERVICE_GROUP|" \

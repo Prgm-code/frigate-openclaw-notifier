@@ -54,8 +54,31 @@ export function parseAlertControlPayload(payload: string | Buffer): boolean | un
   return undefined;
 }
 
+export function parseHomeAssistantOpenClawPayload(payload: string | Buffer): string | undefined {
+  const text = payload.toString().trim();
+  if (!text) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (!isMessagePayload(parsed)) {
+      return undefined;
+    }
+
+    const message = parsed.message.trim();
+    return message ? message : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function isObject(value: unknown): value is { enabled?: unknown } {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isMessagePayload(value: unknown): value is { message: string } {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && typeof (value as { message?: unknown }).message === "string";
 }
 
 export function slugifyTopicPart(value: string): string {
@@ -110,6 +133,10 @@ export function formatGlobalAlertControlMessage(enabled: boolean): string {
 
 export function formatCameraAlertControlMessage(camera: string, enabled: boolean): string {
   return `Alertas Frigate OpenClaw ${camera}: ${enabled ? "ON" : "OFF"}`;
+}
+
+export function formatHomeAssistantOpenClawControlMessage(enabled: boolean): string {
+  return `Mensajes MQTT a OpenClaw: ${enabled ? "ON" : "OFF"}`;
 }
 
 function trimSlash(value: string): string {

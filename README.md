@@ -242,6 +242,63 @@ Configured through:
 MQTT_TOPICS=frigate/events
 ```
 
+Home Assistant direct-to-OpenClaw topic:
+
+```text
+frigate-openclaw-notifier/openclaw/send
+```
+
+Configured through:
+
+```bash
+HOME_ASSISTANT_OPENCLAW_TOPIC=frigate-openclaw-notifier/openclaw/send
+```
+
+Expected payload:
+
+```json
+{
+  "message": "Alerta Home Assistant: porton abierto"
+}
+```
+
+Recommended MQTT publish settings:
+
+```text
+QoS: 1
+Retain: false
+```
+
+Home Assistant direct-to-OpenClaw control topics:
+
+```text
+frigate-openclaw-notifier/openclaw/set
+frigate-openclaw-notifier/openclaw/state
+```
+
+Configured through:
+
+```bash
+HOME_ASSISTANT_OPENCLAW_CONTROL_COMMAND_TOPIC=frigate-openclaw-notifier/openclaw/set
+HOME_ASSISTANT_OPENCLAW_CONTROL_STATE_TOPIC=frigate-openclaw-notifier/openclaw/state
+HOME_ASSISTANT_OPENCLAW_DEFAULT_ENABLED=true
+```
+
+Accepted control payloads:
+
+```text
+on
+off
+true
+false
+1
+0
+enabled
+disabled
+{"enabled":true}
+{"enabled":false}
+```
+
 Global alert command topic:
 
 ```text
