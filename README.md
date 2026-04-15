@@ -137,7 +137,7 @@ The unit expects:
 ```text
 WorkingDirectory=/opt/frigate-openclaw-notifier
 EnvironmentFile=/etc/frigate-openclaw-notifier.env
-ExecStart=/usr/bin/node /opt/frigate-openclaw-notifier/dist/index.js
+ExecStart=/usr/bin/node /opt/frigate-openclaw-notifier/dist/src/index.js
 User=frigate-openclaw
 Group=frigate-openclaw
 ```
@@ -150,6 +150,9 @@ sudo mkdir -p /opt/frigate-openclaw-notifier
 sudo cp -a . /opt/frigate-openclaw-notifier
 sudo chown -R frigate-openclaw:frigate-openclaw /opt/frigate-openclaw-notifier
 ```
+
+You can also run the service with the current user instead. This is useful when
+OpenClaw is already logged in for that user.
 
 Create the environment file from the example:
 
@@ -187,6 +190,40 @@ Restart after configuration changes:
 
 ```bash
 sudo systemctl restart frigate-openclaw-notifier
+```
+
+### Edit locally and deploy
+
+If you keep this repository as the editable working copy, update the installed
+service with:
+
+```bash
+pnpm deploy
+```
+
+The deploy command syncs this working copy to `/opt/frigate-openclaw-notifier`,
+skipping local-only files such as `node_modules`, `dist`, `.git`, and `.env`.
+It then installs dependencies, runs checks, builds the app, installs the systemd
+unit for the current user, and restarts `frigate-openclaw-notifier`.
+
+The deploy command always uses local `.env` as the source of truth for service
+configuration. On every deploy it copies `.env` to
+`/etc/frigate-openclaw-notifier.env`, then applies safe permissions.
+
+You can also create it manually:
+
+```bash
+sudo cp .env.example /etc/frigate-openclaw-notifier.env
+sudo nano /etc/frigate-openclaw-notifier.env
+sudo chown root:$(id -gn) /etc/frigate-openclaw-notifier.env
+sudo chmod 640 /etc/frigate-openclaw-notifier.env
+```
+
+To deploy with a different service account, set `SERVICE_USER` and
+`SERVICE_GROUP`:
+
+```bash
+SERVICE_USER=frigate-openclaw SERVICE_GROUP=frigate-openclaw pnpm deploy
 ```
 
 The service user must be able to run `openclaw message send` with the WhatsApp session you intend to use. If OpenClaw stores session data in a user home directory, run the OpenClaw WhatsApp login as the same service user or adjust `OPENCLAW_BIN` and OpenClaw configuration paths accordingly.

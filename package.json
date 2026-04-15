@@ -7,10 +7,11 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
     "dev": "sh -c 'if [ -f .env ]; then node --env-file=.env --import tsx ./src/index.ts; else node --import tsx ./src/index.ts; fi'",
     "test": "vitest run",
-    "check": "pnpm run build && pnpm run test"
+    "check": "pnpm run build && pnpm run test",
+    "deploy": "bash scripts/deploy.sh"
   },
   "engines": {
     "node": ">=20"
