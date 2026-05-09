@@ -12,7 +12,7 @@ import {
 import { NotifierConfig } from "./config/schema.js";
 import { DedupeStore } from "./dedupe/store.js";
 import { EventCorrelator } from "./frigate/correlator.js";
-import { EventContext, getFrigateEventState, parseFrigateEventMessage, parseReviewMessage, parseTrackedObjectUpdate, selectEventId } from "./frigate/event-models.js";
+import { EventContext, getFrigateEventState, parseFrigateEventMessage, parseReviewMessage, parseTrackedObjectUpdate } from "./frigate/event-models.js";
 import { shouldNotifyReview } from "./frigate/rules.js";
 import { Logger, redactTarget } from "./logger.js";
 import { cleanupOldMedia, removeMediaFiles } from "./media/cleanup.js";
@@ -298,7 +298,7 @@ export class NotifierApp {
 
     try {
       try {
-        const sentSnapshot = await this.sendFrigateEventSnapshot(state.camera, eventId, caption, state.has_snapshot);
+        const sentSnapshot = await this.sendFrigateSnapshot("frigate/events", state.camera, eventId, caption, state.has_snapshot);
         if (!sentSnapshot) {
           this.logger.info("openclaw_send_started", {
             source: "frigate/events",
@@ -323,7 +323,7 @@ export class NotifierApp {
       this.dedupe.mark(dedupeKey, caption);
       if (this.config.sendClip && state.has_clip !== false) {
         this.logger.info("frigate_event_clip_scheduled", { eventId });
-        this.sendFrigateEventClipWhenReady(eventId, state.camera, caption).catch((error: unknown) => {
+        this.sendFrigateClipWhenReady("frigate/events", eventId, state.camera, caption).catch((error: unknown) => {
           this.logger.error("frigate_event_clip_send_failed", {
             eventId,
             error: error instanceof Error ? error.message : String(error)
@@ -344,18 +344,23 @@ export class NotifierApp {
     }
 
     const context = this.correlator.upsertReview(message);
+    const eventId = context.eventIds[0];
     const caption = renderCaption(context, this.config.messageTimeZone);
-    const dedupeKey = context.reviewId || selectEventId(message);
+    const dedupeKey = context.reviewId ? `review:${context.reviewId}` : eventId ? `review:${eventId}` : undefined;
     if (!dedupeKey) {
       this.logger.warn("review_missing_dedupe_key");
       return;
     }
+    if (!eventId) {
+      this.logger.warn("review_missing_detection_id", { reviewId: context.reviewId, camera: context.camera });
+      return;
+    }
     if (!this.alertsEnabled) {
-      this.logger.info("review_notification_suppressed", { reason: "alerts_disabled", reviewId: context.reviewId, eventId: context.eventIds[0] });
+      this.logger.info("review_notification_suppressed", { reason: "alerts_disabled", reviewId: context.reviewId, eventId });
       return;
     }
     if (context.camera && !this.isCameraEnabled(context.camera)) {
-      this.logger.info("review_notification_suppressed", { reason: "camera_alerts_disabled", reviewId: context.reviewId, eventId: context.eventIds[0], camera: context.camera });
+      this.logger.info("review_notification_suppressed", { reason: "camera_alerts_disabled", reviewId: context.reviewId, eventId, camera: context.camera });
       return;
     }
 
@@ -365,28 +370,57 @@ export class NotifierApp {
       return;
     }
 
+    this.dedupe.markInFlight(dedupeKey, caption);
+    this.logger.info("review_selected_for_notification", {
+      reviewId: context.reviewId,
+      eventId,
+      camera: context.camera,
+      severity: context.severity,
+      objects: context.objects,
+      willTrySnapshot: this.config.sendSnapshot,
+      willTryClip: this.config.sendClip
+    });
+
     try {
-      const media = await this.mediaResolver.resolve(context.camera, context.eventIds[0]);
-      if (media) {
-        const results = await this.sendMediaToTargets(media.path, caption);
-        this.logger.info("whatsapp_media_sent", {
-          kind: media.kind,
+      try {
+        const sentSnapshot = await this.sendFrigateSnapshot("frigate/reviews", context.camera, eventId, caption);
+        if (!sentSnapshot) {
+          this.logger.info("openclaw_send_started", {
+            source: "frigate/reviews",
+            kind: "text",
+            reviewId: context.reviewId,
+            eventId,
+            targets: this.redactedTargets()
+          });
+          const results = await this.sendTextToTargets(caption);
+          this.logger.info("whatsapp_text_sent", {
+            source: "frigate/reviews",
+            reviewId: context.reviewId,
+            eventId,
+            results: this.formatSendResults(results)
+          });
+        }
+      } catch (error) {
+        this.logger.error("review_alert_send_failed", {
           reviewId: context.reviewId,
-          eventId: context.eventIds[0],
-          results: this.formatSendResults(results)
-        });
-      } else {
-        const results = await this.sendTextToTargets(caption);
-        this.logger.info("whatsapp_text_sent", {
-          reviewId: context.reviewId,
-          eventId: context.eventIds[0],
-          results: this.formatSendResults(results)
+          eventId,
+          error: error instanceof Error ? error.message : String(error)
         });
       }
 
       const now = Date.now();
       this.dedupe.mark(dedupeKey, caption, now);
       this.correlator.markNotified(context, now);
+      if (this.config.sendClip) {
+        this.logger.info("review_clip_scheduled", { reviewId: context.reviewId, eventId });
+        this.sendFrigateClipWhenReady("frigate/reviews", eventId, context.camera, caption).catch((error: unknown) => {
+          this.logger.error("review_clip_send_failed", {
+            reviewId: context.reviewId,
+            eventId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        });
+      }
     } finally {
       await this.cleanupMedia();
     }
@@ -401,19 +435,20 @@ export class NotifierApp {
     });
   }
 
-  private async sendFrigateEventSnapshot(
+  private async sendFrigateSnapshot(
+    source: "frigate/events" | "frigate/reviews",
     camera: string | undefined,
     eventId: string,
     caption: string,
-    hasSnapshot: boolean | undefined
+    hasSnapshot?: boolean
   ): Promise<boolean> {
     if (this.config.sendSnapshot && hasSnapshot !== false) {
-      this.logger.info("frigate_event_snapshot_resolve_started", { eventId, camera });
+      this.logger.info("frigate_snapshot_resolve_started", { source, eventId, camera });
       const snapshot = await this.mediaResolver.resolveSnapshot(camera, eventId);
       if (snapshot) {
-        this.logger.info("frigate_event_snapshot_resolved", { eventId, path: snapshot.path });
+        this.logger.info("frigate_snapshot_resolved", { source, eventId, path: snapshot.path });
         this.logger.info("openclaw_send_started", {
-          source: "frigate/events",
+          source,
           kind: snapshot.kind,
           eventId,
           path: snapshot.path,
@@ -421,7 +456,7 @@ export class NotifierApp {
         });
         const results = await this.sendMediaToTargets(snapshot.path, caption);
         this.logger.info("whatsapp_media_sent", {
-          source: "frigate/events",
+          source,
           kind: snapshot.kind,
           eventId,
           results: this.formatSendResults(results)
@@ -429,27 +464,29 @@ export class NotifierApp {
         return true;
       }
 
-      this.logger.warn("frigate_event_snapshot_not_available", { eventId, camera });
+      this.logger.warn("frigate_snapshot_not_available", { source, eventId, camera });
     }
 
     return false;
   }
 
-  private async sendFrigateEventClipWhenReady(eventId: string, camera: string | undefined, caption: string): Promise<void> {
-    this.logger.info("frigate_event_clip_download_started", {
+  private async sendFrigateClipWhenReady(source: "frigate/events" | "frigate/reviews", eventId: string, camera: string | undefined, caption: string): Promise<void> {
+    this.logger.info("frigate_clip_download_started", {
+      source,
       eventId,
       attempts: this.config.clipRetryAttempts,
       retryDelayMs: this.config.clipRetryDelayMs
     });
     const clip = await this.mediaResolver.resolveClipWithRetry(eventId);
     if (!clip) {
-      this.logger.warn("frigate_event_clip_not_ready", { eventId });
+      this.logger.warn("frigate_clip_not_ready", { source, eventId });
       return;
     }
 
-    this.logger.info("frigate_event_clip_downloaded", { eventId, path: clip.path });
+    this.logger.info("frigate_clip_downloaded", { source, eventId, path: clip.path });
     const outputPath = this.mediaResolver.processedClipPath(clip.path);
-    this.logger.info("frigate_event_clip_processing_started", {
+    this.logger.info("frigate_clip_processing_started", {
+      source,
       eventId,
       inputPath: clip.path,
       outputPath,
@@ -459,19 +496,19 @@ export class NotifierApp {
     let processedPath: string | undefined;
     try {
       processedPath = await processVideoForWhatsapp(this.config.ffmpegBin, clip.path, outputPath, this.config.videoProcessTimeoutMs);
-      this.logger.info("frigate_event_clip_processing_completed", { eventId, path: processedPath });
+      this.logger.info("frigate_clip_processing_completed", { source, eventId, path: processedPath });
 
       if (!this.alertsEnabled) {
-        this.logger.info("frigate_event_clip_send_suppressed", { reason: "alerts_disabled", eventId });
+        this.logger.info("frigate_clip_send_suppressed", { source, reason: "alerts_disabled", eventId });
         return;
       }
       if (camera && !this.isCameraEnabled(camera)) {
-        this.logger.info("frigate_event_clip_send_suppressed", { reason: "camera_alerts_disabled", eventId, camera });
+        this.logger.info("frigate_clip_send_suppressed", { source, reason: "camera_alerts_disabled", eventId, camera });
         return;
       }
 
       this.logger.info("openclaw_send_started", {
-        source: "frigate/events",
+        source,
         kind: "clip",
         eventId,
         path: processedPath,
@@ -479,7 +516,7 @@ export class NotifierApp {
       });
       const results = await this.sendMediaToTargets(processedPath, `Video: ${caption}`);
       this.logger.info("whatsapp_media_sent", {
-        source: "frigate/events",
+        source,
         kind: "clip",
         eventId,
         processed: true,

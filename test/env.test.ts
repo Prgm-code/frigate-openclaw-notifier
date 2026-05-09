@@ -23,7 +23,7 @@ describe("loadConfig", () => {
     expect(config.mqttUrl).toBe(testEnv.mqttUrl);
     expect(config.mqttUsername).toBe(testEnv.mqttUsername);
     expect(config.mqttPassword).toBe(testEnv.mqttPassword);
-    expect(config.mqttTopics).toContain(testEnv.mqttTopics[0]);
+    expect(config.mqttTopics).toEqual(["frigate/reviews"]);
     expect(config.homeAssistantOpenClawTopic).toBe("frigate-openclaw-notifier/openclaw/send");
     expect(config.homeAssistantOpenClawControlCommandTopic).toBe("frigate-openclaw-notifier/openclaw/set");
     expect(config.homeAssistantOpenClawControlStateTopic).toBe("frigate-openclaw-notifier/openclaw/state");

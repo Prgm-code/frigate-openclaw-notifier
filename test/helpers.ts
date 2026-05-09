@@ -4,7 +4,7 @@ export const testEnv = {
   mqttUrl: "mqtt://example.invalid:1883",
   mqttUsername: "test-user",
   mqttPassword: "test-password",
-  mqttTopics: ["frigate/events"],
+  mqttTopics: ["frigate/reviews"],
   homeAssistantOpenClawTopic: "notifier-test/openclaw/send",
   homeAssistantOpenClawControlCommandTopic: "notifier-test/openclaw/set",
   homeAssistantOpenClawControlStateTopic: "notifier-test/openclaw/state",

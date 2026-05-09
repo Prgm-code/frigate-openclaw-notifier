@@ -6,7 +6,7 @@ It sends with `openclaw message send`. It does not use chat completions, agents,
 
 ## Features
 
-- Listens to Frigate MQTT events, normally `frigate/events`.
+- Listens to Frigate review MQTT events, normally `frigate/reviews`.
 - Sends a fast WhatsApp alert with a snapshot when available.
 - Downloads clips, transcodes them with `ffmpeg`, then sends the video as a second WhatsApp message when ready.
 - Deduplicates repeated MQTT updates for the same Frigate event.
@@ -233,13 +233,13 @@ The service user must be able to run `openclaw message send` with the WhatsApp s
 Frigate input topic:
 
 ```text
-frigate/events
+frigate/reviews
 ```
 
 Configured through:
 
 ```bash
-MQTT_TOPICS=frigate/events
+MQTT_TOPICS=frigate/reviews
 ```
 
 Home Assistant direct-to-OpenClaw topic:
@@ -391,11 +391,11 @@ Retained state restored on startup does not send WhatsApp confirmations, to avoi
 
 ## Media Flow
 
-For `frigate/events`:
+For `frigate/reviews`:
 
-1. The service logs the event.
+1. The service logs the review.
 2. It sends a snapshot alert immediately when available.
-3. If `has_clip` is true, it downloads the clip with retries.
+3. If `SEND_CLIP=true`, it downloads the clip for the review detection id with retries.
 4. It transcodes the clip with `ffmpeg` for WhatsApp compatibility.
 5. It sends the processed video as a second WhatsApp message.
 6. It removes the original and processed clip files after the send attempt.

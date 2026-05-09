@@ -11,7 +11,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): NotifierConfig
     mqttUrl: requireString(env.MQTT_URL, "MQTT_URL"),
     mqttUsername: env.MQTT_USERNAME || undefined,
     mqttPassword: env.MQTT_PASSWORD || undefined,
-    mqttTopics: parseList(env.MQTT_TOPICS).length > 0 ? parseList(env.MQTT_TOPICS) : ["frigate/events"],
+    mqttTopics: parseList(env.MQTT_TOPICS).length > 0 ? parseList(env.MQTT_TOPICS) : ["frigate/reviews"],
     homeAssistantOpenClawTopic: env.HOME_ASSISTANT_OPENCLAW_TOPIC || "frigate-openclaw-notifier/openclaw/send",
     homeAssistantOpenClawControlCommandTopic: env.HOME_ASSISTANT_OPENCLAW_CONTROL_COMMAND_TOPIC || "frigate-openclaw-notifier/openclaw/set",
     homeAssistantOpenClawControlStateTopic: env.HOME_ASSISTANT_OPENCLAW_CONTROL_STATE_TOPIC || "frigate-openclaw-notifier/openclaw/state",
